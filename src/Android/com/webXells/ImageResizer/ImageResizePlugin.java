@@ -19,8 +19,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import org.apache.cordova.api.CallbackContext;
-import org.apache.cordova.api.CordovaPlugin;
+import org.apache.cordova.CallbackContext;
+import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.PluginResult;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -38,6 +39,7 @@ public class ImageResizePlugin extends CordovaPlugin {
 	public static String IMAGE_DATA_TYPE_URL = "urlImage";
 	public static String RESIZE_TYPE_FACTOR = "factorResize";
 	public static String RESIZE_TYPE_PIXEL = "pixelResize";
+    public static String RESIZE_TYPE_MAX_PIXEL = "maxPixelResize";
 	public static String RETURN_BASE64 = "returnBase64";
 	public static String RETURN_URI = "returnUri";
 	public static String FORMAT_JPG = "jpg";
@@ -46,15 +48,29 @@ public class ImageResizePlugin extends CordovaPlugin {
 	public static String DEFAULT_IMAGE_DATA_TYPE = IMAGE_DATA_TYPE_BASE64;
 	public static String DEFAULT_RESIZE_TYPE = RESIZE_TYPE_FACTOR;
 
-	@Override
-	public boolean execute(String action, JSONArray data,
-			CallbackContext callbackContext) {
+	/**
+     * Executes the request and returns PluginResult.
+     * 
+     * @param action
+     *            The action to execute.
+     * @param args
+     *            JSONArray of arguments for the plugin.
+     * @param callbackId
+     *            The callback id used when calling back into JavaScript.
+     * @return A PluginResult object with a status and message.
+     */
+    public boolean execute(String action, JSONArray data, final CallbackContext callbackContext) throws JSONException {
 		JSONObject params;
 		String imageData;
 		String imageDataType;
 		String format;
 		Bitmap bmp;
 		Log.d("PLUGIN", action);
+        if (data.length() < 1) {
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.INVALID_ACTION));
+            return false;
+        }
+
 		try {
 			// parameters (forst object of the json array)
 			params = data.getJSONObject(0);
@@ -69,9 +85,11 @@ public class ImageResizePlugin extends CordovaPlugin {
 			// create the Bitmap object, needed for all functions
 			bmp = getBitmap(imageData, imageDataType);
 		} catch (JSONException e) {
-			callbackContext.error(e.getMessage());
+			e.printStackTrace();
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION));
 			return false;
 		} catch (IOException e) {
+            Log.e("ImageResizePlugin", e.toString());
 			callbackContext.error(e.getMessage());
 			return false;
 		}
@@ -92,9 +110,16 @@ public class ImageResizePlugin extends CordovaPlugin {
 				double width = params.getDouble("width");
 				double height = params.getDouble("height");
 
-				if (resizeType.equals(RESIZE_TYPE_PIXEL)) {
-					widthFactor = width / ((double) bmp.getWidth());
+				if (resizeType.equals(RESIZE_TYPE_MAX_PIXEL)) {
+                    widthFactor = width / ((double) bmp.getWidth());
 					heightFactor = height / ((double) bmp.getHeight());
+
+                    if (width == 0 && height > 0) {
+                        widthFactor = heightFactor;
+                    }
+                    if (width > 0 && height == 0) {
+                        heightFactor = widthFactor;
+                    }
 				} else {
 					widthFactor = width;
 					heightFactor = height;
@@ -118,7 +143,8 @@ public class ImageResizePlugin extends CordovaPlugin {
 				callbackContext.success(res);
 				return true;
 			} catch (JSONException e) {
-				callbackContext.error(e.getMessage());
+				Log.e("ImageResizePlugin", e.toString());
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION));
 				return false;
 			}
 		} else if (action.equals("imageSize")) {
@@ -131,7 +157,8 @@ public class ImageResizePlugin extends CordovaPlugin {
 				callbackContext.success(res);
 				return true;
 			} catch (JSONException e) {
-				callbackContext.error(e.getMessage());
+                Log.e("ImageResizePlugin", e.toString());
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.JSON_EXCEPTION));
 				return false;
 			}
 		} else if (action.equals("storeImage")) {
@@ -204,5 +231,4 @@ public class ImageResizePlugin extends CordovaPlugin {
 		}
 		return bmp;
 	}
-
 }
